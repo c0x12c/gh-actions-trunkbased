@@ -1,0 +1,5 @@
+# Ignore JetBrains (IntelliJ, PyCharm, etc.) project files
+.idea/
+
+# Ignore macOS system files
+**/.DS_Store
