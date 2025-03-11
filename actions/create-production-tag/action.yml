@@ -1,0 +1,80 @@
+name: Create Production Tag
+description: "This action creates a tag on the release branch and optionally triggers a Jenkins build for that tag."
+
+inputs:
+  github-app-id:
+    description: "GitHub App ID"
+    required: true
+
+  github-private-key:
+    description: "GitHub Private Key"
+    required: true
+
+  use-jenkins-build:
+    description: "Trigger Jenkins Build"
+    required: false
+    default: 'false'
+
+  jenkins-url:
+    description: "Jenkins Server URL"
+    required: false
+
+  jenkins-job-folder:
+    description: "Jenkins Job Folder (Defaults to repository owner)"
+    required: false
+    default: ${{ github.repository_owner }}
+
+  jenkins-job-name:
+    description: "Jenkins Job Name (Defaults to repository name)"
+    required: false
+    default: ${{ github.event.repository.name }}
+
+  jenkins-user:
+    description: "Jenkins Username"
+    required: false
+
+  jenkins-token:
+    description: "Jenkins API Token"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate GitHub App Token
+      uses: actions/create-github-app-token@v1
+      id: github-app-token
+      with:
+        app-id: ${{ inputs.github-app-id }}
+        private-key: ${{ inputs.github-private-key }}
+
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ steps.github-app-token.outputs.token }}
+        ref: ${{ github.head_ref }}
+
+    - name: Create Release Tag
+      id: tag-release
+      shell: bash
+      run: |
+        git config --global --add safe.directory /harness
+        git config --global user.email "github-actions@github.com"
+        git config --global user.name "GitHub Actions"
+        
+        chmod +x ${{ github.action_path }}/../../tools/create_tag.sh
+        ${{ github.action_path }}/../../tools/create_tag.sh
+      env:
+        GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+
+    - name: Trigger Jenkins Build for Tag
+      shell: bash
+      if: ${{ inputs.use-jenkins-build == 'true' }}
+      run: |
+        chmod +x ${{ github.action_path }}/../../tools/jenkins_build_tag.sh
+        ${{ github.action_path }}/../../tools/jenkins_build_tag.sh \
+          ${{ inputs.jenkins-url }} \
+          ${{ inputs.jenkins-job-folder }} \
+          ${{ inputs.jenkins-job-name }} \
+          ${{ inputs.jenkins-user }} \
+          ${{ inputs.jenkins-token }} \
+          ${{ steps.tag-release.outputs.release_version }}

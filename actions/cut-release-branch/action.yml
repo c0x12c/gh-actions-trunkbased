@@ -1,0 +1,40 @@
+name: Cut Release Branch
+description: "Creates a release branch from the master branch if running on master, or syncs the given release branch with master."
+
+inputs:
+  github-app-id:
+    description: "GitHub App ID"
+    required: true
+
+  github-private-key:
+    description: "GitHub Private Key"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate GitHub App Token
+      uses: actions/create-github-app-token@v1
+      id: github-app-token
+      with:
+        app-id: ${{ inputs.github-app-id }}
+        private-key: ${{ inputs.github-private-key }}
+
+    - name: Checkout Source Code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ steps.github-app-token.outputs.token }}
+        ref: ${{ github.head_ref }}
+
+    - name: Create or Sync Release Branch
+      shell: bash
+      run: |
+        git config --global --add safe.directory /harness
+        git config --global user.email "github-actions@github.com"
+        git config --global user.name "GitHub Actions"
+
+        chmod +x ${{env.GITHUB_ACTION_PATH}}/../../tools/cut_release.sh
+        ${{env.GITHUB_ACTION_PATH}}/../../tools/cut_release.sh "${{ github.event_name }}"
+      env:
+        GITHUB_TOKEN: ${{ steps.github-app-token.outputs.token }}
+        GITHUB_ACTION_PATH: ${{ github.action_path }}
